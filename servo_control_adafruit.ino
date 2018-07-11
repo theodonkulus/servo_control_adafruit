@@ -25,16 +25,19 @@
 #define SERVOMAX  410 // this is the 'maximum' pulse length count (out of 4096)
 #define NUM_CHANNELS 16
 
-#define ANKLE_0  0
-#define HIP_0    1
-#define ANKLE_1  2
-#define HIP_1    3
-#define ANKLE_2  4
-#define HIP_2    5
-#define ANKLE_3  6
-#define HIP_3    7
+typedef enum servo_type_e 
+{
+    ANKLE_0 = 0,
+    HIP_0,      /* 1 */  
+    ANKLE_1,    /* 2 */
+    HIP_1,      /* 3 */
+    ANKLE_2,    /* 4 */
+    HIP_2,      /* 5 */
+    ANKLE_3,    /* 6 */
+    HIP_3,      /* 7 */
+    NUM_JOINTS  /* 8 */
+}servo_type_t;
 
-#define NUM_JOINTS 8
 
 typedef struct servo_s{
   uint16_t curAngle; //8.8 -90 to 90 , with two sig digs.

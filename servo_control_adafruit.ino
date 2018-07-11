@@ -38,8 +38,10 @@ typedef enum servo_type_e
     NUM_JOINTS  /* 8 */
 }servo_type_t;
 
+unsigned char jointPwmChLUT[NUM_JOINTS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
-typedef struct servo_s{
+typedef struct servo_s
+{
   uint16_t curAngle; //8.8 -90 to 90 , with two sig digs.
   uint16_t prevAngle; //8.8 -90 to 90 , with two sig digs.
   uint16_t nextAngle; //8.8 -90 to 90 , with two sig digs.
@@ -49,6 +51,7 @@ typedef struct servo_s{
   unsigned char needsUpdate;
   unsigned char pwmChannel; //channel for the PWM controller to modify  
   unsigned char jointNum;//What joint in the chain it is
+  servo_type_t type;
 } servo_t;
 
 static servo_t joints[NUM_JOINTS];
@@ -60,18 +63,7 @@ unsigned short p_ch[NUM_CHANNELS];
 #define NUM_RADIO_CHAN 6
 int rad_ch[NUM_RADIO_CHAN]; // Here's where we'll keep our channel values
 int prev_rad_ch[NUM_RADIO_CHAN]; // Here's where we'll keep our channel values
-bool diff = false;
-bool toggle_switch_on = false;
-int val = -565;
-unsigned int frame;
-
-//incomming serial command stuff
-unsigned char incoming_char;
-unsigned char checksum;
-
-//state stuff
-bool update_pwm = false;
-
+unsigned char toggle_switch_on = 0;
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
                                                
@@ -88,15 +80,15 @@ void setup()
     {
         ch[i] = 0;
         p_ch[i] = ch[i];
-        pwm.setPWM(joints[i].PWMChannel, 0, SERVONEUT);
         joints[i].curTick  = SERVONEUT;
         joints[i].prevTick = SERVONEUT;
         joints[i].newTick  = SERVONEUT;
         joints[i].curAngle = 0;
         joints[i].prevAngle = 0;
         joints[i].nextAngle = 0;
-        joints[i].jointNum = i;
-        
+        joints[i].PWMChannel = jointPwmChLUT[i];
+        joints[i].type = i;
+        pwm.setPWM(joints[i].PWMChannel, 0, SERVONEUT);
     }
     
     //Setup reciever defines for each incomming signal
@@ -108,13 +100,15 @@ void setup()
     pinMode(2, INPUT); //Throt
 }
 
-
-void loop()
+bool rcRecieverPoll(unsigned int timeWindow)
 {
+    bool result = false;
+    unsigned int frame;
+
     //update values based on input pulses from transmitter
     for(int i = 0; i < NUM_RADIO_CHAN; i++)
     {
-       rad_ch[i] = pulseIn(i+2, HIGH, 20000);
+       rad_ch[i] = pulseIn(i+2, HIGH, timeWindow);
        if( (abs(rad_ch[i] - prev_rad_ch[i]) > 20)) 
        {
            /*Serial.print(frame, DEC);
@@ -127,121 +121,179 @@ void loop()
            Serial.print(" ");
            Serial.println(map(rad_ch[i], 1000,2000,-500,500)); // center at 0*/
                     
-           diff = true;
+           result = true;
        }    
     }    
-    delay(20);
+    return result;
+}
+
+int processRcCommand()
+{
+
+     /*
+    bool update_pwm = false;
+    int val = -565;
+
+    if((val >= rad_ch[6]) && (toggle_switch_on == false))
+    {
+        toggle_switch_on = true;
+        Serial.print("Serial mode engaged!");
+    } else {
+        toggle_switch_on = false;
+    }*/
+   //int ch_diff = rad_ch[i] -  prev_rad_ch[i];
+   /*int ch_diff =  rad_ch[5] - prev_rad_ch[5];
+   int i = 15;
+   Serial.print("ch15 diff ");
+   Serial.print(ch_diff, DEC);
+   int gain = 2;
+   if( 
+   (abs(ch_diff) > 20))
+   {
+     
+     if(ch_diff > 1500)
+     {
+       
+         ch[i] += gain*(rad_ch[5] / (SERVOMAX) - SERVOMIN);
+         update_pwm = 1;
+         if(ch[i] >= SERVOMAX)
+         {
+             update_pwm = 0;
+             ch[i] = SERVOMAX;
+         }
+        Serial.print(" UP ");   
+     } 
+     else if (ch_diff < 1500 )
+     {
+         ch[i] -=  gain*(rad_ch[5] / (SERVOMAX) - SERVOMIN);
+         update_pwm = 1;
+         if(ch[i] < SERVOMIN)
+         {
+             update_pwm = 0;
+             ch[i] = SERVOMIN;
+         }
+         Serial.print(" DOWN ");
+     } 
+   }
+
+   prev_rad_ch[i] = rad_ch[i];
+   if(update_pwm)
+   {
+      Serial.print(ch[i], DEC);
+      Serial.print(" radio in ");
+      Serial.print(rad_ch[5]);
+      Serial.println();
+      if(ch[i] != p_ch[i])
+      {
+          p_ch[i] = ch[i];
+          pwm.setPWM(i, 0, ch[i]);
+      }
+  }*/
+}
+
+
+/******************************************
+*   readIncomingCommands()
+*
+*   Read command over serial and update the desired
+*   system state 
+*   
+*   Returns: 0 - nothing recieved
+             1 - recieved something
+            -1 - command not handled 
+******************************************/
+int readIncommingCommands()
+{
+    unsigned char incoming_char;
+    unsigned char checksum;
+    int ret = 0;
+    int bytes_available = Serial.available();
+
+    if(bytes_available > 0) 
+    {
+        ret = -1;
+        incoming_char = Serial.read(); 
+        if(incoming_char == 0x27)
+        {
+            bytes_available--;
+            while(bytes_available > 1)
+            {   
+                unsigned char c;
+                unsigned int data;
+                
+                incoming_char = Serial.read();
+                checksum += incoming_char;
+                
+                c = ((0xF0 & incoming_char) >> 4);
+                data = ((0x0F & incoming_char) << 8);
+                
+                incoming_char = Serial.read();
+                checksum += incoming_char;
+                
+                data |= incoming_char;
+                ch[c] = data;
+
+                bytes_available -= 2;
+            }  
+            incoming_char = Serial.read();
+            bytes_available--;
+
+            if(incoming_char == checksum)
+            {
+                Serial.write(checksum);
+                ret = 1;
+            }
+        }
+        Serial.println("16 channel Servo Aquire complete!");
+    }
+    return ret;
+}
+
+
+/******************************************
+*   moveServos()
+*
+*   Move servos based on the needsUpdate flag and newTick value 
+*   
+*   Returns: Nothing 
+******************************************/
+void moveServos()
+{
+    unsigned char update;
+    unsigned char channel;
+     
+    for(i = 0; i < NUM_JOINTS; i++)
+    {
+        update  = joints[i].needsUpdate;
+        channel = joints[i].pwmChannel;
+        newTick = joints[i].newTick;
     
+        if(update)
+        {
+            pwm.setPWM(channel, 0, newTick);
+            /* update previous state */
+            joints[i].prevTick = joints[i].curTick;
+            /* Set current state to new value */
+            joints[i].curTick = newTick;
+        }   
+    }
+}
+
+void loop()
+{
+    
+    /* ToDo: Use IRQS to grab reciever values */
+    diff = rcRecieverPoll(200000);
+    delay(20);    
     if(diff)
     {
-        /*if((val >= rad_ch[6]) && (toggle_switch_on == false))
-        {
-            toggle_switch_on = true;
-            Serial.print("Serial mode engaged!");
-        } else {
-            toggle_switch_on = false;
-        }*/
-         Serial.println();
-
-
-
-           //int ch_diff = rad_ch[i] -  prev_rad_ch[i];
-           int ch_diff =  rad_ch[5] - prev_rad_ch[5];
-           int i = 15;
-           Serial.print("ch15 diff ");
-           Serial.print(ch_diff, DEC);
-           int gain = 2;
-           if( 
-           (abs(ch_diff) > 20))
-           {
-             
-             if(ch_diff > 1500)
-             {
-               
-                 ch[i] += gain*(rad_ch[5] / (SERVOMAX) - SERVOMIN);
-                 update_pwm = 1;
-                 if(ch[i] >= SERVOMAX)
-                 {
-                     update_pwm = 0;
-                     ch[i] = SERVOMAX;
-                 }
-                Serial.print(" UP ");   
-             } 
-             else if (ch_diff < 1500 )
-             {
-                 ch[i] -=  gain*(rad_ch[5] / (SERVOMAX) - SERVOMIN);
-                 update_pwm = 1;
-                 if(ch[i] < SERVOMIN)
-                 {
-                     update_pwm = 0;
-                     ch[i] = SERVOMIN;
-                 }
-                 Serial.print(" DOWN ");
-             } 
-           }
-
-           prev_rad_ch[i] = rad_ch[i];
-           if(update_pwm)
-           {
-              Serial.print(ch[i], DEC);
-              Serial.print(" radio in ");
-              Serial.print(rad_ch[5]);
-              Serial.println();
-              if(ch[i] != p_ch[i])
-              {
-                  p_ch[i] = ch[i];
-                  pwm.setPWM(i, 0, ch[i]);
-              }
-          }
-    
-         update_pwm = 0;
-         diff = false;  
+        processRcCommand();
     }
 
-    /*if(toggle_switch_on == 1)
+    if(toggle_switch_on == 1) 
     {
-        //Read incomming serial commands then set PWM freq/params
-        int bytes_available = Serial.available();
-        if(bytes_available > 0) 
-        {
-            incoming_char = Serial.read(); 
-            
-            if(incoming_char == 0x27)
-            {
-                bytes_available--;
-                
-                while(bytes_available > 1)
-                {   
-                    unsigned char c;
-                    unsigned int data;
-                    
-                    incoming_char = Serial.read();
-                    checksum += incoming_char;
-                    
-                    c = ((0xF0 & incoming_char) >> 4);
-                    data = ((0x0F & incoming_char) << 8);
-                    
-                    incoming_char = Serial.read();
-                    checksum += incoming_char;
-                    
-                    data |= incoming_char;
-                    ch[c] = data;
-    
-                    bytes_available -= 2;
-                }  
-                incoming_char = Serial.read();
-                bytes_available--;
-    
-                if(incoming_char == checksum)
-                {
-                    Serial.write(checksum);
-                    update_pwm = 1;
-                }
-            }
-            Serial.println("16 channel Servo Aquire complete!");
-        }
-    } */
+       update_pwm = readIncommingCommands()
+    }
 
-
-    checksum = 0;
+    moveServos();
 }

@@ -1,3 +1,9 @@
+#include <TimerOne.h>
+
+#include <StaticThreadController.h>
+#include <ThreadController.h>
+#include <Thread.h>
+
 #include "Wire.h"
 #include "Adafruit_PWMServoDriver.h"
 
@@ -45,9 +51,9 @@ typedef struct servo_s
   uint16_t curAngle; //8.8 -90 to 90 , with two sig digs.
   uint16_t prevAngle; //8.8 -90 to 90 , with two sig digs.
   uint16_t nextAngle; //8.8 -90 to 90 , with two sig digs.
-  uint16_t curTick; 
-  uint16_t prevTick;
-  uint16_t newTick;
+  unsigned long long curTick; 
+  unsigned long long prevTick;
+  unsigned long long newTick;
   unsigned char needsUpdate;
   unsigned char pwmChannel; //channel for the PWM controller to modify  
   unsigned char jointNum;//What joint in the chain it is
@@ -55,6 +61,7 @@ typedef struct servo_s
 } servo_t;
 
 static servo_t joints[NUM_JOINTS];
+static unsigned long long sysTime = 0;
 
 unsigned short ch[NUM_CHANNELS];
 unsigned short p_ch[NUM_CHANNELS];
@@ -66,39 +73,13 @@ int prev_rad_ch[NUM_RADIO_CHAN]; // Here's where we'll keep our channel values
 unsigned char toggle_switch_on = 0;
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
-                                               
-void setup()
-{
-    Serial.begin(115200);
-    Serial.println("16 channel Servo test!");
 
-    pwm.begin();
-    pwm.setPWMFreq(50);  // Analog servos run at ~50 Hz updates
-    
-    //set all joint channels to neutral position on startup
-    for(unsigned int i = 0; i < NUM_JOINTS; i++)
-    {
-        ch[i] = 0;
-        p_ch[i] = ch[i];
-        joints[i].curTick  = SERVONEUT;
-        joints[i].prevTick = SERVONEUT;
-        joints[i].newTick  = SERVONEUT;
-        joints[i].curAngle = 0;
-        joints[i].prevAngle = 0;
-        joints[i].nextAngle = 0;
-        joints[i].PWMChannel = jointPwmChLUT[i];
-        joints[i].type = i;
-        pwm.setPWM(joints[i].PWMChannel, 0, SERVONEUT);
-    }
-    
-    //Setup reciever defines for each incomming signal
-    pinMode(4, INPUT); //Elev
-    pinMode(5, INPUT); //Rudd
-    pinMode(6, INPUT); //Gear 
-    pinMode(7, INPUT); //AUX1 
-    pinMode(3, INPUT); //Aile
-    pinMode(2, INPUT); //Throt
-}
+/* thread related */
+Thread rcCommandUpdateThread = Thread();
+Thread serialCmdThread = Thread();
+
+StaticThreadController<2> threadCtrl (&rcCommandUpdateThread, &serialFrameCommandPop);
+
 
 bool rcRecieverPoll(unsigned int timeWindow)
 {
@@ -127,91 +108,21 @@ bool rcRecieverPoll(unsigned int timeWindow)
     return result;
 }
 
-int processRcCommand()
-{
-
-     /*
-    bool update_pwm = false;
-    int val = -565;
-
-    if((val >= rad_ch[6]) && (toggle_switch_on == false))
-    {
-        toggle_switch_on = true;
-        Serial.print("Serial mode engaged!");
-    } else {
-        toggle_switch_on = false;
-    }*/
-   //int ch_diff = rad_ch[i] -  prev_rad_ch[i];
-   /*int ch_diff =  rad_ch[5] - prev_rad_ch[5];
-   int i = 15;
-   Serial.print("ch15 diff ");
-   Serial.print(ch_diff, DEC);
-   int gain = 2;
-   if( 
-   (abs(ch_diff) > 20))
-   {
-     
-     if(ch_diff > 1500)
-     {
-       
-         ch[i] += gain*(rad_ch[5] / (SERVOMAX) - SERVOMIN);
-         update_pwm = 1;
-         if(ch[i] >= SERVOMAX)
-         {
-             update_pwm = 0;
-             ch[i] = SERVOMAX;
-         }
-        Serial.print(" UP ");   
-     } 
-     else if (ch_diff < 1500 )
-     {
-         ch[i] -=  gain*(rad_ch[5] / (SERVOMAX) - SERVOMIN);
-         update_pwm = 1;
-         if(ch[i] < SERVOMIN)
-         {
-             update_pwm = 0;
-             ch[i] = SERVOMIN;
-         }
-         Serial.print(" DOWN ");
-     } 
-   }
-
-   prev_rad_ch[i] = rad_ch[i];
-   if(update_pwm)
-   {
-      Serial.print(ch[i], DEC);
-      Serial.print(" radio in ");
-      Serial.print(rad_ch[5]);
-      Serial.println();
-      if(ch[i] != p_ch[i])
-      {
-          p_ch[i] = ch[i];
-          pwm.setPWM(i, 0, ch[i]);
-      }
-  }*/
-}
-
-
 /******************************************
 *   readIncomingCommands()
 *
 *   Read command over serial and update the desired
 *   system state 
 *   
-*   Returns: 0 - nothing recieved
-             1 - recieved something
-            -1 - command not handled 
 ******************************************/
-int readIncommingCommands()
+void readIncommingCommands()
 {
     unsigned char incoming_char;
     unsigned char checksum;
-    int ret = 0;
     int bytes_available = Serial.available();
 
     if(bytes_available > 0) 
     {
-        ret = -1;
         incoming_char = Serial.read(); 
         if(incoming_char == 0x27)
         {
@@ -246,9 +157,7 @@ int readIncommingCommands()
         }
         Serial.println("16 channel Servo Aquire complete!");
     }
-    return ret;
 }
-
 
 /******************************************
 *   moveServos()
@@ -277,6 +186,55 @@ void moveServos()
             joints[i].curTick = newTick;
         }   
     }
+}
+
+void timerCallback() 
+{
+    sysTime++;
+    threadCtrl.run();
+}
+                                 
+void setup()
+{
+    Serial.begin(115200);
+    Serial.println("16 channel Servo test!");
+
+    pwm.begin();
+    pwm.setPWMFreq(50);  // Analog servos run at ~50 Hz updates
+    
+    //set all joint channels to neutral position on startup
+    for(unsigned int i = 0; i < NUM_JOINTS; i++)
+    {
+        ch[i] = 0;
+        p_ch[i] = ch[i];
+        joints[i].curTick  = SERVONEUT;
+        joints[i].prevTick = SERVONEUT;
+        joints[i].newTick  = SERVONEUT;
+        joints[i].curAngle = 0;
+        joints[i].prevAngle = 0;
+        joints[i].nextAngle = 0;
+        joints[i].PWMChannel = jointPwmChLUT[i];
+        joints[i].type = i;
+        pwm.setPWM(joints[i].PWMChannel, 0, SERVONEUT);
+    }
+    
+    //Setup reciever defines for each incomming signal
+    pinMode(4, INPUT); //Elev
+    pinMode(5, INPUT); //Rudd
+    pinMode(6, INPUT); //Gear 
+    pinMode(7, INPUT); //AUX1 
+    pinMode(3, INPUT); //Aile
+    pinMode(2, INPUT); //Throt
+
+    /* Use a 1us timer to gate threads */
+    /* Set a 1us timer for the timing of threads. */
+    Timer1.initialize(1);
+    Timer1.attachInterrupt(timerCallback);
+    
+    /* Thread setup callbacks*/
+    serialCmdThread->onRun(readIncommingCommands);
+    serialCmdThread->setInterval(20000);
+    
 }
 
 void loop()

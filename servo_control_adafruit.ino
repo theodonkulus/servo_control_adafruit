@@ -1,11 +1,12 @@
 #include <TimerOne.h>
-
 #include <StaticThreadController.h>
 #include <ThreadController.h>
 #include <Thread.h>
 
 #include "Wire.h"
 #include "Adafruit_PWMServoDriver.h"
+
+
 
 
 
@@ -63,9 +64,6 @@ typedef struct servo_s
 static servo_t joints[NUM_JOINTS];
 static unsigned long long sysTime = 0;
 
-unsigned short ch[NUM_CHANNELS];
-unsigned short p_ch[NUM_CHANNELS];
-
 //radio channel defines
 #define NUM_RADIO_CHAN 6
 int rad_ch[NUM_RADIO_CHAN]; // Here's where we'll keep our channel values
@@ -75,38 +73,12 @@ unsigned char toggle_switch_on = 0;
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
 
 /* thread related */
-Thread rcCommandUpdateThread = Thread();
-Thread serialCmdThread = Thread();
+Thread getRcRecieverThread = Thread();
+Thread getImuDataThread = Thread();
+Thread getSerialCmdThread = Thread();
+Thread setMoveServos = Thread();
 
-StaticThreadController<2> threadCtrl (&rcCommandUpdateThread, &serialFrameCommandPop);
-
-
-bool rcRecieverPoll(unsigned int timeWindow)
-{
-    bool result = false;
-    unsigned int frame;
-
-    //update values based on input pulses from transmitter
-    for(int i = 0; i < NUM_RADIO_CHAN; i++)
-    {
-       rad_ch[i] = pulseIn(i+2, HIGH, timeWindow);
-       if( (abs(rad_ch[i] - prev_rad_ch[i]) > 20)) 
-       {
-           /*Serial.print(frame, DEC);
-           Serial.print(" Ch");
-           Serial.print(i, DEC);
-           Serial.print(" idx");
-           Serial.print(i+2, DEC);
-           Serial.print(" ");
-           Serial.print(rad_ch[i]);
-           Serial.print(" ");
-           Serial.println(map(rad_ch[i], 1000,2000,-500,500)); // center at 0*/
-                    
-           result = true;
-       }    
-    }    
-    return result;
-}
+StaticThreadController<4> threadCtrl (&getRcRecieverThread, &getImuDataThread, &getSerialCmdThread, &setMoveServos);
 
 /******************************************
 *   readIncomingCommands()
@@ -142,7 +114,7 @@ void readIncommingCommands()
                 checksum += incoming_char;
                 
                 data |= incoming_char;
-                ch[c] = data;
+                //ch[c] = data;
 
                 bytes_available -= 2;
             }  
@@ -152,7 +124,6 @@ void readIncommingCommands()
             if(incoming_char == checksum)
             {
                 Serial.write(checksum);
-                ret = 1;
             }
         }
         Serial.println("16 channel Servo Aquire complete!");
@@ -170,7 +141,9 @@ void moveServos()
 {
     unsigned char update;
     unsigned char channel;
-     
+    unsigned char newTick;
+    unsigned char i;
+ 
     for(i = 0; i < NUM_JOINTS; i++)
     {
         update  = joints[i].needsUpdate;
@@ -205,26 +178,25 @@ void setup()
     //set all joint channels to neutral position on startup
     for(unsigned int i = 0; i < NUM_JOINTS; i++)
     {
-        ch[i] = 0;
-        p_ch[i] = ch[i];
         joints[i].curTick  = SERVONEUT;
         joints[i].prevTick = SERVONEUT;
         joints[i].newTick  = SERVONEUT;
         joints[i].curAngle = 0;
         joints[i].prevAngle = 0;
         joints[i].nextAngle = 0;
-        joints[i].PWMChannel = jointPwmChLUT[i];
-        joints[i].type = i;
-        pwm.setPWM(joints[i].PWMChannel, 0, SERVONEUT);
+        joints[i].pwmChannel = jointPwmChLUT[i];
+        joints[i].type = (servo_type_t)i;
+        pwm.setPWM(joints[i].pwmChannel, 0, SERVONEUT);
     }
     
-    //Setup reciever defines for each incomming signal
-    pinMode(4, INPUT); //Elev
-    pinMode(5, INPUT); //Rudd
-    pinMode(6, INPUT); //Gear 
-    pinMode(7, INPUT); //AUX1 
-    pinMode(3, INPUT); //Aile
-    pinMode(2, INPUT); //Throt
+    //Setup reciever defines for each incomming signal 20ms ` 21.8 Frames
+    //Signals are staggered from an initial commands
+    pinMode(4, INPUT); //Elev    top/down from right control stick 1ms-2ms
+    pinMode(5, INPUT); //Rudd    left right on control stick 1.5ms center 0.2ms swing
+    pinMode(6, INPUT); //Gear    ch5 right encoder 1.5ms center 1ms-2ms
+    pinMode(7, INPUT); //AUX1    
+    pinMode(3, INPUT); //Aile    Left right on right stick 1ms-2ms 1.5ms center
+    pinMode(2, INPUT); //Throt   Forward back on left stick 1ms-2ms 1.5ms center
 
     /* Use a 1us timer to gate threads */
     /* Set a 1us timer for the timing of threads. */
@@ -232,8 +204,8 @@ void setup()
     Timer1.attachInterrupt(timerCallback);
     
     /* Thread setup callbacks*/
-    serialCmdThread->onRun(readIncommingCommands);
-    serialCmdThread->setInterval(20000);
+    getSerialCmdThread.onRun(readIncommingCommands);
+    getSerialCmdThread.setInterval(20000);
     
 }
 
@@ -241,17 +213,5 @@ void loop()
 {
     
     /* ToDo: Use IRQS to grab reciever values */
-    diff = rcRecieverPoll(200000);
-    delay(20);    
-    if(diff)
-    {
-        processRcCommand();
-    }
 
-    if(toggle_switch_on == 1) 
-    {
-       update_pwm = readIncommingCommands()
-    }
-
-    moveServos();
 }

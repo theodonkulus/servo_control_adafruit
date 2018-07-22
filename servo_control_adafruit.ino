@@ -6,27 +6,26 @@
 #include "Wire.h"
 #include "Adafruit_PWMServoDriver.h"
 
+/* *********************************************************
+*  called this way, it uses the default address 0x40
+*  you can also call it with a different address you want 
+************************************************************/
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
 
 
-
-
-// called this way, it uses the default address 0x40
-// you can also call it with a different address you want
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
-
-// Depending on your servo make, the pulse width min and max may vary, you
-// want these to be as small/large as possible without hitting the hard stop
-// for max range. You'll have to tweak them as necessary to match the servos you
-// have!
-
-//MG90 servos
-//min -90  = 1.0 ms
-//neut 0   = 1.5 ms
-//max  90  = 2.0 ms
-//deadtime = 5us 
-//50 Hz
-
-//servo channel stuff
+/*********************************************************************** 
+* Depending on your servo make, the pulse width min and max may vary, you
+* want these to be as small/large as possible without hitting the hard stop
+* for max range. You'll have to tweak them as necessary to match the servos you have.
+* 
+*  MG90 servos
+*  min -90  = 1.0 ms
+*  neut 0   = 1.5 ms
+*  max  90  = 2.0 ms
+*  deadtime = 5us 
+*  50 Hz
+****************************************************************************/
+/* servo channel stuff */
 #define SERVOMIN  201 // this is the 'minimum' pulse length count (out of 4096)
 #define SERVONEUT 305
 #define SERVOMAX  410 // this is the 'maximum' pulse length count (out of 4096)
@@ -34,18 +33,26 @@
 
 typedef enum servo_type_e 
 {
-    ANKLE_0 = 0,
-    HIP_0,      /* 1 */  
-    ANKLE_1,    /* 2 */
-    HIP_1,      /* 3 */
-    ANKLE_2,    /* 4 */
-    HIP_2,      /* 5 */
-    ANKLE_3,    /* 6 */
-    HIP_3,      /* 7 */
-    NUM_JOINTS  /* 8 */
+    ANKLE_0        = 0,
+    HIP_0,      /* = 1 */  
+    ANKLE_1,    /* = 2 */
+    HIP_1,      /* = 3 */
+    ANKLE_2,    /* = 4 */
+    HIP_2,      /* = 5 */
+    ANKLE_3,    /* = 6 */
+    HIP_3,      /* = 7 */
+    NUM_JOINTS  /* = 8 */
 }servo_type_t;
 
-unsigned char jointPwmChLUT[NUM_JOINTS] = {0, 1, 2, 3, 4, 5, 6, 7};
+unsigned char jointPwmChLUT[NUM_JOINTS] = {ANKLE_0, 
+                                             HIP_0, 
+                                           ANKLE_1,
+                                             HIP_1,
+                                           ANKLE_2,
+                                             HIP_2,       
+                                           ANKLE_3,
+                                             HIP_3
+                                          };
 
 typedef struct servo_s
 {
@@ -62,15 +69,27 @@ typedef struct servo_s
 } servo_t;
 
 static servo_t joints[NUM_JOINTS];
-static unsigned long long sysTime = 0;
 
-//radio channel defines
-#define NUM_RADIO_CHAN 6
-int rad_ch[NUM_RADIO_CHAN]; // Here's where we'll keep our channel values
-int prev_rad_ch[NUM_RADIO_CHAN]; // Here's where we'll keep our channel values
-unsigned char toggle_switch_on = 0;
+/*radio channel defines */
+typedef enum radio_channel_e 
+{
+    THROTTLE          = 0,
+    AILE,          /* = 1 */  
+    ELEV,          /* = 2 */
+    RUDD,          /* = 3 */
+    GEAR,          /* = 4 */
+    AUX,           /* = 5 */
+    NUM_RADIO_CHAN /* = 6 */
+}radio_channel_t;
 
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
+typedef struct radio_channel_s
+{
+  unsigned long long startTick;
+  unsigned long long endTick;
+} radio_t;
+static volatile radio_t radio_channel[NUM_RADIO_CHAN];
+
+volatile static unsigned long long sysTime = 0;
 
 /* thread related */
 Thread getRcRecieverThread = Thread();
@@ -79,6 +98,50 @@ Thread getSerialCmdThread = Thread();
 Thread setMoveServos = Thread();
 
 StaticThreadController<4> threadCtrl (&getRcRecieverThread, &getImuDataThread, &getSerialCmdThread, &setMoveServos);
+
+/**********************************
+ * getThrottleStartTime()
+ * 
+ * Get the sysTime when the Throttle PWM starts
+ * Currently using the Throttle as the Start of frame.
+ *********************************/
+ void getThrottleStartTime()
+ {
+    radio_channel[THROTTLE].startTick = sysTime;
+ }
+
+ /**********************************
+ * getThrottleStartTime()
+ * 
+ * Get the sysTime when the ThrottlePWM ends
+ * Currently using the Throttle as the Start of frame.
+ *********************************/
+ void getThrottleEndTime()
+ {    
+    radio_channel[THROTTLE].endTick = sysTime;
+ }
+
+/**********************************
+ * getAileStartTime()
+ * 
+ * Get the sysTime when the AilePWM starts
+ * Currently using the Aile as sinc in frame.
+ *********************************/
+ void getAileStartTime()
+ {
+    radio_channel[AILE].startTick = sysTime;
+ }
+
+ /**********************************
+ * getAileEndTime()
+ * 
+ * Get the sysTime when the AilePWM ends
+ * Currently using the Aile as sync in the frame.
+ *********************************/
+ void getAileEndTime()
+ {    
+    radio_channel[AILE].endTick = sysTime;
+ }
 
 /******************************************
 *   readIncomingCommands()
@@ -170,7 +233,7 @@ void timerCallback()
 void setup()
 {
     Serial.begin(115200);
-    Serial.println("16 channel Servo test!");
+    //Serial.println("Droid debug Start!");
 
     pwm.begin();
     pwm.setPWMFreq(50);  // Analog servos run at ~50 Hz updates
@@ -189,23 +252,33 @@ void setup()
         pwm.setPWM(joints[i].pwmChannel, 0, SERVONEUT);
     }
     
-    //Setup reciever defines for each incomming signal 20ms ` 21.8 Frames
-    //Signals are staggered from an initial commands
-    pinMode(4, INPUT); //Elev    top/down from right control stick 1ms-2ms
-    pinMode(5, INPUT); //Rudd    left right on control stick 1.5ms center 0.2ms swing
-    pinMode(6, INPUT); //Gear    ch5 right encoder 1.5ms center 1ms-2ms
-    pinMode(7, INPUT); //AUX1    
-    pinMode(3, INPUT); //Aile    Left right on right stick 1ms-2ms 1.5ms center
-    pinMode(2, INPUT); //Throt   Forward back on left stick 1ms-2ms 1.5ms center
+    /* ***********************************************************************
+     *  Setup reciever defines for each incomming signal 20ms ` 21.8 Frames
+     * Signals are staggered from an initial commands 
+     ************************************************************************/
+    pinMode(4, INPUT); /* Elev    top/down from right control stick 1ms-2ms */
+    pinMode(5, INPUT); /* Rudd    left right on control stick 1.5ms center 0.2ms swing */
+    pinMode(6, INPUT); /* Gear    ch5 right encoder 1.5ms center 1ms-2ms */
+    pinMode(7, INPUT); /* AUX1    
+    pinMode(3, INPUT); /* Aile    Left right on right stick 1ms-2ms 1.5ms center */
+    pinMode(2, INPUT); /* Throt   Forward back on left stick 1ms-2ms 1.5ms center */
+
+     
+    /* Thread setup callbacks*/
+    getSerialCmdThread.onRun(readIncommingCommands);
+    getSerialCmdThread.setInterval(20000);
+
+   /* setup interrupt pins for start of rc frame updates */
+    attachInterrupt(digitalPinToInterrupt(2), getThrottleStartTime, HIGH);
+    attachInterrupt(digitalPinToInterrupt(2), getThrottleEndTime, LOW);
+    attachInterrupt(digitalPinToInterrupt(3), getAileStartTime, HIGH);
+    attachInterrupt(digitalPinToInterrupt(3), getAileEndTime, LOW);
 
     /* Use a 1us timer to gate threads */
     /* Set a 1us timer for the timing of threads. */
     Timer1.initialize(1);
     Timer1.attachInterrupt(timerCallback);
-    
-    /* Thread setup callbacks*/
-    getSerialCmdThread.onRun(readIncommingCommands);
-    getSerialCmdThread.setInterval(20000);
+    Timer1.start();
     
 }
 

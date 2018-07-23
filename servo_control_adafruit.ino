@@ -70,6 +70,12 @@ typedef struct servo_s
 
 static servo_t joints[NUM_JOINTS];
 
+/* Inverse Kinematics */
+#define NUM_LEGS 4
+static float bodyIKTransform[4][4];
+static float legIKTransform[NUM_LEGS][4][4];
+
+
 /*radio channel defines */
 typedef enum radio_channel_e 
 {
@@ -87,8 +93,9 @@ typedef struct radio_channel_s
   unsigned long long startTick;
   unsigned long long endTick;
 } radio_t;
-static volatile radio_t radio_channel[NUM_RADIO_CHAN];
 
+
+static volatile radio_t radio_channel[NUM_RADIO_CHAN];
 volatile static unsigned long long sysTime = 0;
 
 /* thread related */
@@ -150,7 +157,7 @@ StaticThreadController<4> threadCtrl (&getRcRecieverThread, &getImuDataThread, &
 *   system state 
 *   
 ******************************************/
-void readIncommingCommands()
+/*void readIncommingCommands()
 {
     unsigned char incoming_char;
     unsigned char checksum;
@@ -191,7 +198,7 @@ void readIncommingCommands()
         }
         Serial.println("16 channel Servo Aquire complete!");
     }
-}
+}*/
 
 /******************************************
 *   moveServos()
@@ -202,18 +209,18 @@ void readIncommingCommands()
 ******************************************/
 void moveServos()
 {
-    unsigned char update;
+    bool updateMove;
     unsigned char channel;
     unsigned char newTick;
     unsigned char i;
  
     for(i = 0; i < NUM_JOINTS; i++)
     {
-        update  = joints[i].needsUpdate;
+        updateMove = joints[i].needsUpdate;
         channel = joints[i].pwmChannel;
         newTick = joints[i].newTick;
     
-        if(update)
+        if(updateMove)
         {
             pwm.setPWM(channel, 0, newTick);
             /* update previous state */
@@ -232,7 +239,7 @@ void timerCallback()
                                  
 void setup()
 {
-    Serial.begin(115200);
+    //Serial.begin(115200);
     //Serial.println("Droid debug Start!");
 
     pwm.begin();
@@ -259,14 +266,14 @@ void setup()
     pinMode(4, INPUT); /* Elev    top/down from right control stick 1ms-2ms */
     pinMode(5, INPUT); /* Rudd    left right on control stick 1.5ms center 0.2ms swing */
     pinMode(6, INPUT); /* Gear    ch5 right encoder 1.5ms center 1ms-2ms */
-    pinMode(7, INPUT); /* AUX1    
+    pinMode(7, INPUT); /* AUX1      Mirrors what*/  
     pinMode(3, INPUT); /* Aile    Left right on right stick 1ms-2ms 1.5ms center */
     pinMode(2, INPUT); /* Throt   Forward back on left stick 1ms-2ms 1.5ms center */
 
      
     /* Thread setup callbacks*/
-    getSerialCmdThread.onRun(readIncommingCommands);
-    getSerialCmdThread.setInterval(20000);
+    /*getSerialCmdThread.onRun(readIncommingCommands);
+    getSerialCmdThread.setInterval(20000); */
 
    /* setup interrupt pins for start of rc frame updates */
     attachInterrupt(digitalPinToInterrupt(2), getThrottleStartTime, HIGH);

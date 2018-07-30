@@ -70,11 +70,36 @@ typedef struct servo_s
 
 static servo_t joints[NUM_JOINTS];
 
-/* Inverse Kinematics */
-#define NUM_LEGS 4
+/* Inverse Kinematics related */
 static float bodyIKTransform[4][4];
-static float legIKTransform[NUM_LEGS][4][4];
+static float legIKTransform[4][4];
 
+typedef struct position_s
+{
+  int32_t x;
+  int32_t y;
+  int32_t z;
+} position_t;
+
+#define NUM_LEGS 4
+#define JOINTS_PER_LEG 2
+typedef struct leg_s
+{
+    position_t current_p;  /* position of end effector */
+    position_t next_p;     
+    position_t previous_p;  
+    servo_t*   servo[JOINTS_PER_LEG]; /*servos associated with the joint */
+}leg_t;
+
+typedef struct body_s
+{
+    position_t current_p;
+    position_t next_p;
+    position_t previous_p;
+    leg_t legs[NUM_LEGS];
+}body_t;
+
+body_t robot_body;
 
 /*radio channel defines */
 typedef enum radio_channel_e 
@@ -231,6 +256,71 @@ void moveServos()
     }
 }
 
+/***********************************************************************
+* Sets the position of the body in 3 space before sending its coordinate
+* down to the legs
+*************************************************************************/
+void posForBodyIK(uint16_t target_x_pos, uint16_t target_y_pos)
+{
+    
+}
+
+void setIKForLeg(unsigned char legNumber, uint16_t)
+{
+
+}
+
+void solveIK(unsigned int)
+{
+
+
+}
+
+void setLegTargetPos(unsigned char legNumber, uint16_t tx, uint16_t ty, uint16_t yz)
+{
+
+}
+
+/* need to flush out more of the backend but the creep should do this */
+/*void creepGait()
+{
+    //STARTING POSITION
+    Set_Leg_Position_0Cartes(‘A’, 50,10,down);
+    Set_Leg_Position_0Cartes(‘B’, 50, -10,down);
+    Set_Leg_Position_0Cartes(‘C’, -50,50,down);
+    Set_Leg_Position_0Cartes(‘D’, -50, -50,down);
+
+
+    //STEP 1
+    Step_in_Y(‘B’, -10,110);
+
+
+    //SHIFT1
+    Move_in_Y(‘A’, 10,-50);
+    Move_in_Y(‘B’, 110,50);
+    Move_in_Y(‘C’, 50,-10);
+    Move_in_Y(‘D’, -50,-110);
+
+
+    //STEP 2
+    Step_in_Y(‘D’, -110,10);
+
+
+    //STEP 3
+    Step_in_Y(‘C’, -10,110);
+
+
+    //SHIFT1
+    Move_in_Y(‘A’, -50,-110);
+    Move_in_Y(‘B’, 50,-10);
+    Move_in_Y(‘C’, 110,50);
+    Move_in_Y(‘D’, 10,-50);
+
+
+    //STEP 4
+    Step_in_Y(‘A’, -110,10);
+}*/
+
 void timerCallback() 
 {
     sysTime++;
@@ -241,9 +331,9 @@ void setup()
 {
     //Serial.begin(115200);
     //Serial.println("Droid debug Start!");
-
+    /* Analog servos run at ~50 Hz updates*/
     pwm.begin();
-    pwm.setPWMFreq(50);  // Analog servos run at ~50 Hz updates
+    pwm.setPWMFreq(50);  
     
     //set all joint channels to neutral position on startup
     for(unsigned int i = 0; i < NUM_JOINTS; i++)

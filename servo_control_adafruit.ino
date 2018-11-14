@@ -3,46 +3,14 @@
 #include <ThreadController.h>
 #include <Thread.h>
 
-#include "Wire.h"
-#include "Adafruit_PWMServoDriver.h"
 
 /* *********************************************************
 *  called this way, it uses the default address 0x40
 *  you can also call it with a different address you want 
 ************************************************************/
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
 
 
-/*********************************************************************** 
-* Depending on your servo make, the pulse width min and max may vary, you
-* want these to be as small/large as possible without hitting the hard stop
-* for max range. You'll have to tweak them as necessary to match the servos you have.
-* 
-*  MG90 servos
-*  min -90  = 1.0 ms
-*  neut 0   = 1.5 ms
-*  max  90  = 2.0 ms
-*  deadtime = 5us 
-*  50 Hz
-****************************************************************************/
-/* servo channel stuff */
-#define SERVOMIN  201 // this is the 'minimum' pulse length count (out of 4096)
-#define SERVONEUT 305
-#define SERVOMAX  410 // this is the 'maximum' pulse length count (out of 4096)
-#define NUM_CHANNELS 16
 
-typedef enum servo_type_e 
-{
-    ANKLE_0        = 0,
-    HIP_0,      /* = 1 */  
-    ANKLE_1,    /* = 2 */
-    HIP_1,      /* = 3 */
-    ANKLE_2,    /* = 4 */
-    HIP_2,      /* = 5 */
-    ANKLE_3,    /* = 6 */
-    HIP_3,      /* = 7 */
-    NUM_JOINTS  /* = 8 */
-}servo_type_t;
 
 unsigned char jointPwmChLUT[NUM_JOINTS] = {ANKLE_0, 
                                              HIP_0, 
@@ -54,19 +22,6 @@ unsigned char jointPwmChLUT[NUM_JOINTS] = {ANKLE_0,
                                              HIP_3
                                           };
 
-typedef struct servo_s
-{
-  uint16_t curAngle; //8.8 -90 to 90 , with two sig digs.
-  uint16_t prevAngle; //8.8 -90 to 90 , with two sig digs.
-  uint16_t nextAngle; //8.8 -90 to 90 , with two sig digs.
-  unsigned long long curTick; 
-  unsigned long long prevTick;
-  unsigned long long newTick;
-  unsigned char needsUpdate;
-  unsigned char pwmChannel; //channel for the PWM controller to modify  
-  unsigned char jointNum;//What joint in the chain it is
-  servo_type_t type;
-} servo_t;
 
 static servo_t joints[NUM_JOINTS];
 

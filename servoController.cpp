@@ -12,19 +12,39 @@
 *  50 Hz
 ****************************************************************************/
 
-#include "Wire.h"
 #include "Adafruit_PWMServoDriver.h"
 
-servoController::servoController(enum driverType_e type, 
-                                 void *args, 
-                                 uint8_t lenArgs)
+servoController::servoController(driverArts_t *args) 
 {
-    
+    bool init_driver = false;
+    if(args);
+    {
+        switch(args->driver)
+        {   
+            case ADAFRUIT_SERVO_DRIVER:
+                this.type = SERVO_CTRL_TYPE_PWM;
+                this.interface = CTRL_IF_I2C;
+                pwmDriver = Adafruit_PWMServoDriver(args->addr);
+                init_driver = true;
+                break;
+                
+            default:    
+                break;
+        }   
+    }
+
+    if (!init_driver)
+    {
+        delete(this);
+    }
 }
 
 servoController::~servoController()
 {
-
+    if (pwmDriver)
+    {
+        delete(pwmDriver);
+    } 
 }
 
 

@@ -3,6 +3,18 @@
 
 #include "Adafruit_PWMServoDriver.h"
 
+enum supportedDriver_e {
+    ADAFRUIT_SERVO_DRIVER = 0,
+    MAX_NUM_SUPPORTED_DRIVERS
+};
+
+typedef struct driverArgs_s;
+{
+    uint8_t addr;
+    enum supportedDriver_e driver;
+    float freq;
+}driverArgs_t;
+
 class servoController {
         public: 
             enum driverType{
@@ -17,7 +29,7 @@ class servoController {
                 CTRL_IF_SPI,
                 MAX_DRIVER_IF_TYPES
             };
-            servoController(enum driverType_e type, void * args, uint8_t lenArgs);
+            servoController(driverArgs_t *args);
             ~servoController();
     
             getCtrlType(){return type;};

@@ -3,11 +3,29 @@
 #include <ThreadController.h>
 #include <Thread.h>
 
+#include "motion.h"
+#include "servoController.h"
 
 /* *********************************************************
 *  called this way, it uses the default address 0x40
 *  you can also call it with a different address you want 
 ************************************************************/
+
+
+typedef struct servo_s
+{
+  uint16_t curAngle; //8.8 -90 to 90 , with two sig digs.
+  uint16_t prevAngle; //8.8 -90 to 90 , with two sig digs.
+  uint16_t nextAngle; //8.8 -90 to 90 , with two sig digs.
+  unsigned long long curTick; 
+  unsigned long long prevTick;
+  unsigned long long newTick;
+  unsigned char needsUpdate;
+  unsigned char pwmChannel; //channel for the PWM controller to modify  
+  unsigned char jointNum;//What joint in the chain it is
+  servo_type_t type;
+} servo_t; 
+
 
 
 
@@ -78,13 +96,18 @@ typedef struct radio_channel_s
 static volatile radio_t radio_channel[NUM_RADIO_CHAN];
 volatile static unsigned long long sysTime = 0;
 
+ServoController *ctrlCtx = 0;
+
 /* thread related */
 Thread getRcRecieverThread = Thread();
 Thread getImuDataThread = Thread();
 Thread getSerialCmdThread = Thread();
 Thread setMoveServos = Thread();
 
-StaticThreadController<4> threadCtrl (&getRcRecieverThread, &getImuDataThread, &getSerialCmdThread, &setMoveServos);
+StaticThreadController<4> threadCtrl (&getRcRecieverThread, 
+                                      &getImuDataThread, 
+                                      &getSerialCmdThread, 
+                                      &setMoveServos);
 
 /**********************************
  * getThrottleStartTime()
@@ -187,7 +210,7 @@ StaticThreadController<4> threadCtrl (&getRcRecieverThread, &getImuDataThread, &
 *   
 *   Returns: Nothing 
 ******************************************/
-void moveServos()
+/*void moveServos()
 {
     bool updateMove;
     unsigned char channel;
@@ -203,13 +226,13 @@ void moveServos()
         if(updateMove)
         {
             pwm.setPWM(channel, 0, newTick);
-            /* update previous state */
+            // update previous state 
             joints[i].prevTick = joints[i].curTick;
-            /* Set current state to new value */
+            // Set current state to new value 
             joints[i].curTick = newTick;
         }   
     }
-}
+}*/
 
 /***********************************************************************
 * Sets the position of the body in 3 space before sending its coordinate
@@ -281,17 +304,22 @@ void timerCallback()
     sysTime++;
     threadCtrl.run();
 }
-                                 
+    
+                             
 void setup()
 {
     //Serial.begin(115200);
     //Serial.println("Droid debug Start!");
     /* Analog servos run at ~50 Hz updates*/
-    pwm.begin();
-    pwm.setPWMFreq(50);  
-    
+    driverArgs_t ctrlArgs; 
+    ctrlArgs.addr = 0x41;
+    ctrlArgs.driver = ADAFRUIT_SERVO_DRIVER;
+    ctrlArgs.freq = 50;
+
+    ctrlCtx = new ServoController(&ctrlArgs);    
+
     //set all joint channels to neutral position on startup
-    for(unsigned int i = 0; i < NUM_JOINTS; i++)
+    /*for(unsigned int i = 0; i < NUM_JOINTS; i++)
     {
         joints[i].curTick  = SERVONEUT;
         joints[i].prevTick = SERVONEUT;
@@ -302,7 +330,7 @@ void setup()
         joints[i].pwmChannel = jointPwmChLUT[i];
         joints[i].type = (servo_type_t)i;
         pwm.setPWM(joints[i].pwmChannel, 0, SERVONEUT);
-    }
+    }*/
     
     /* ***********************************************************************
      *  Setup reciever defines for each incomming signal 20ms ` 21.8 Frames

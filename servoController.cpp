@@ -14,6 +14,11 @@
 #include "servoController.h"
 #include "Adafruit_PWMServoDriver.h"
 
+/**************************************************************************
+* Constructor
+
+  @param driverArgs_t args - argument for the driver used for the servos
+***************************************************************************/
 ServoController::ServoController(driverArgs_t *args) 
 {
     bool init_driver = false;
@@ -48,6 +53,10 @@ ServoController::ServoController(driverArgs_t *args)
     _curDriver = args->driver;
 }
 
+/***************************************************************************
+  Destructor 
+  Release the driver
+*/
 ServoController::~ServoController()
 {
     if (_pwmDriver)
@@ -56,6 +65,14 @@ ServoController::~ServoController()
     } 
 }
 
+/**************************************************************************
+* setAnglePos
+
+  @param uint8_t ch   - The channel of the servo of the angle you want to set
+  @param uint16_t angle - the angle to set the servo to
+
+  Converts the angle to the tick value needed to set the PWM in ticks
+**************************************************************************/
 uint16_t ServoController::setAnglePos(uint8_t ch, uint16_t angle)
 {
     uint16_t tick = 0;
@@ -69,4 +86,4 @@ uint16_t ServoController::setAnglePos(uint8_t ch, uint16_t angle)
 }
 
 
-
+ 

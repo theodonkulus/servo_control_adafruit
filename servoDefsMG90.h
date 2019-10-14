@@ -17,6 +17,10 @@
 #define SERVO_PERIOD_MS    20
 #define SERVO_PERIOD_US    20000
 #define SERVO_DEADTIME_US  5
+#define SERVO_ANGLE_RNG    180    /* Degress */
+#define SERVO_CENTER_US    1500
+#define SERVO_NEG_90_US    1000
+#define SERVO_POS_90_US    2000
 
 /*Definitions using the Adafruit PWM driver */ 
 #define SERVOMIN           201 // this is the 'minimum' pulse length count (out of 4096)

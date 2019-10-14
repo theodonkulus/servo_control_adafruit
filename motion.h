@@ -9,6 +9,7 @@
 
 #include "servoController.h"
 #include "servoState.h"
+#include "Arduino.h"
 
 #define NUM_HIPS    4
 #define HIP_SPACING 2
@@ -32,18 +33,22 @@ typedef enum servo_type_e
 class MotionDriver {
     public:
         MotionDriver(ServoController *ctrl,
-                     uint8_t numServos);
+                     uint8_t numServos,
+                     bool debug = false);
         ~MotionDriver();
 
         void setPose();
+        float rotateAnkle(uint8_t ch, float angle);
         void setHips(float angle);
+        void moveAnkles(float angle);
         void updatePose();
 
     private:
+        uint8_t _rotateFlag;
         ServoController *_ctrlCtx;
         ServoState  *_servo[NUM_JOINTS];
         uint8_t _numServos;
-
+        bool _debug;
 };
 
 

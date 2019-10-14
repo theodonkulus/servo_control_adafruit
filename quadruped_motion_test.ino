@@ -24,6 +24,9 @@ enum {
 unsigned int mode = DEBUG_HOME;
 
 void setup() {
+  mode = DEBUG_HOME;
+  //Serial.begin(115200);
+  
   // put your setup code here, to run once:
   driverArgs_t ctrlArgs;
   ctrlArgs.addr = 0x41;
@@ -36,27 +39,30 @@ void setup() {
   oscLeg0.setPeriod(SERVO_PERIOD_MS);
   oscLeg0.setOffset(90);
   oscLeg0.setAmplitude(40);
-  oscLeg0.setPhase(90);
+  oscLeg0.setPhase(0);
   oscLeg0.start();
 
-  oscLeg2.setPeriod(SERVO_PERIOD_MS);
+  /*oscLeg2.setPeriod(SERVO_PERIOD_MS);
   oscLeg2.setOffset(90);
   oscLeg2.setAmplitude(40);
   oscLeg2.setPhase(90);
-  oscLeg2.start();
+  oscLeg2.start(); */
 
-  robotMotion = new MotionDriver(ctrlCtx, NUM_JOINTS);
+  robotMotion = new MotionDriver(ctrlCtx, NUM_JOINTS, false);
   robotMotion->setHips(90);
-
-  mode = DEBUG_HOME;
-  Serial.begin(115200);
   
 }
- 
-static char outAngleStr[15];
 
 void loop()
 {
-        Serial.println("Test");
+    float oscOutput = oscLeg0.refresh();
+/*    static int i = 0;
+     i++;
+        if ((i % 1000) == 0) 
+        {
+           Serial.println(i);
+        }*/
+        robotMotion->moveAnkles(oscOutput);
         robotMotion->updatePose(); 
+        //delay(1);
 }

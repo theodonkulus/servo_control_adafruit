@@ -27,9 +27,10 @@ void setup() {
   mode = DEBUG_HOME;
   //Serial.begin(115200);
   
+   delay(10);
   // put your setup code here, to run once:
   driverArgs_t ctrlArgs;
-  ctrlArgs.addr = 0x41;
+  ctrlArgs.addr = 0x40;
   ctrlArgs.driver = ADAFRUIT_SERVO_DRIVER;
   ctrlArgs.freq = 50;
 

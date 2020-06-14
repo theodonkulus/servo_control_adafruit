@@ -13,11 +13,14 @@
 
 class IK_engine {
     #define NUM_LEGS 4
+    #define NUM_LINKS 3
 
     typedef struct coord_s {
         double x;
         double y;
+        double z;
     } coord_t;
+
 
     public:
         IK_engine();
@@ -37,6 +40,7 @@ class IK_engine {
         coord_t getRelativeLegCoord(unsigned char legNum);
 
     private:
+        int bodyIK(void);
         int generateLegServoAngles(unsigned legNum);
         
     public:
@@ -50,6 +54,13 @@ class IK_engine {
         coord_t _footCoord[NUM_LEGS];
         double _hipAngle[NUM_LEGS];
         double _kneeAngle[NUM_LEGS];
+
+        double  _linkLength[NUM_LINKS]; // in mm
+        coord_t _legOffset[NUM_LEGS]; // in mm
+        double  _legAngleOffset[NUM_LEGS]; // in mm
+        coord_t _initFootPos[NUM_LEGS];
+        double  _bodyLength;
+               
 };
 
 #endif /* INVERSE_KINEMATICS_H */

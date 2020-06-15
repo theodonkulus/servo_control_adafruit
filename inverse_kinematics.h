@@ -21,6 +21,18 @@ class IK_engine {
         double z;
     } coord_t;
 
+    typedef struct angle_s {
+        double yaw;a /* About X */
+        double pitch;/* About Y */
+        double roll; /* About Z */
+    } angle_t;
+
+    enum joint_e {
+        COXA = 0,
+        FEMUR,
+        TIBIA,
+        NUM_JOINTS
+    };
 
     public:
         IK_engine();
@@ -39,6 +51,9 @@ class IK_engine {
         double getRelativeLegY(unsigned char legNum);
         coord_t getRelativeLegCoord(unsigned char legNum);
 
+        int setRelativeBodyPos(coord_t bodyPos);
+        int setRelativeBodyTilt(angle_t bodyAngle);
+
     private:
         int bodyIK(void);
         int generateLegServoAngles(unsigned legNum);
@@ -46,20 +61,34 @@ class IK_engine {
     public:
 
     private:
-        double _LegTransformationMatrix[4][4];
-        
-        //variables related to position
-        coord_t _tgtFootPos[NUM_LEGS];
-
-        coord_t _footCoord[NUM_LEGS];
-        double _hipAngle[NUM_LEGS];
-        double _kneeAngle[NUM_LEGS];
-
+    
+        /* Geometric values that dont change */
         double  _linkLength[NUM_LINKS]; // in mm
         coord_t _legOffset[NUM_LEGS]; // in mm
         double  _legAngleOffset[NUM_LEGS]; // in mm
         coord_t _initFootPos[NUM_LEGS];
         double  _bodyLength;
+
+        /* Body states */
+        angle_t _bodyCurTilt;
+        coord_t _bodyCurPos;
+   
+        coord_t _bodyIK;
+
+        angle_t _bodyTgtTilt;
+        coord_t _bodyTgtPos;
+ 
+        /* Body state to use for foot angle calculations */
+        coord_t _bodyToFootIK[NUM_LEGS];
+
+        /* variables related to foot states */
+        coord_t _footCoord[NUM_LEGS];
+        coord_t _tgtFootPos[NUM_LEGS];
+
+        /* Output of IK given foot position and ctrl input */
+        double _hipAngle[NUM_LEGS];
+        double _kneeAngle[NUM_LEGS];
+      
                
 };
 

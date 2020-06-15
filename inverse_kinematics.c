@@ -1,11 +1,15 @@
 /*****************************************************
-*
-*
-*
-*
+* Inverse kinematics class and stuff related to getting this robot to move. 
+* Adatped from some sorces online for hexapods with a bit of massaging.
+* eg) http://toglefritz.com/hexapod-inverse-kinematics-equations/
+*   
+* TODO: Make this not suck and cleanup his math/implementation. Some things seem to be
+* able to be precalculated
 *******************************************************/
 
 #include "inverse_kinematics.h"
+#include "cmath.h"
+
 
 /* Cosntructor 
 
@@ -116,9 +120,61 @@ coord_t IK_engine::getRelativeLegCoord(unsigned char legNum)
 }
 
 int IK_engine::bodyIK(void)
+{   
+    double totalX[NUM_LEGS] = {0};
+    double totalY[NUM_LEGS] = {0};
+    double distBodyCenterFeet[NUM_LEGS] = {0};
+    double angleBodyCenter[NUM_LEGS] = {0};
+    double rollZ[NUM_LEGS] = {0};
+    double pitchZ[NUM_LEGS] = {0};
+
+    for (int i = 0; i < NUM_LEGS; i++) 
+    {
+        totalX[i] = _initFootPos[i].x + _bodyLength + _bodyTgtPos.x                         
+        totalY[i] = _initFootPos[i].y + _bodyLength + _bodyTgtPos.y
+
+        distBodyCenterFeet[i] = sqrt(totalX[i] ^ 2 + totalY[i] ^2);
+        angleBodyCenter[i] = (PI * 0.5) - atan2(totalY[i], totalX[i]);                       
+        rollZ[i]  = tan(_bodyTgtTilt.roll * PI/180.00) * totalX[i];
+        pitchZ[i] = tan(_bodyTgtTilt.yaw * PI/180.00) * totalY[i];
+
+       double val = angleBodyCenter[i] + (_bodyTgTilt.pitch * PI/180);
+        _bodyToFootIK[i].x = cos(val) * distBodyCenterFeet[i] - totalX[i];
+        _bodyToFootIK[i].y = sin(val) * distBodyCenterFeet[i] - totalY[i];
+        _bodyToFootIK[i].z = rollZ[i] + pitchZ[i];
+    }
+}
+
+int IK_engine::LegIK(void)
 {
+    coord_t newFootPos;
+    double coxaFootDist[NUM_LEGS] = {0};
+    double IKSW[NUM_LEGS] = {0};
+    double IKA1[NUM_LEGS] = {0};
+    double IKA2[NUM_LEGS] = {0};
+    double TAngle[NUM_LEGS]       = {0};
+    double IKTibiaAngle[NUM_LEGS] = {0};
+    double IKFemurAngle[NUM_LEGS] = {0};
+    double IKCoxaAngle[NUM_LEGS]  = {0};
 
+    for (int i = 0; i < NUM_LEGS; i++) 
+    {
+        newFootPos[i].x = _initFeetPos[i].x + _bodyTgtPos.x + _bodytoFootIK[i].x;
+        newFootPos[i].y = _initFeetPos[i].y + _bodyTgtPos.y + _bodytoFootIK[i].y;
+        newFootPos[i].z = _initFeetPos[i].z + _bodyTgtPos.z + _bodytoFootIK[i].z;
 
+        coxaFootDist[i] = sqrt(newFootPos[i].x ^2 + newFootPos[i].y ^2);
+
+        IKSW[i] = sqrt((coxaFeetFist[i] - _linkLength[0])^2 + newFootPos[i].z);
+        IKA1[i] = atan( (coxaFeetFist[i] - _linkLength[0]) / newFootPos[i].z);
+        IKA2[i] = acos( (_linkLength[2]^2 - _linKlength[1] ^2 - IKSW[i] ^2)/ (-2 & IKSW[i] * _linkLength[0]));
+
+        TAngle[i] = acos((IKSW[i]^2 - _linkLength[2]^2 - _linkLength[0]^2 ) / (-2 * _linkLength[1] * _linkLength[2]));
+        
+        IKTibiaAngle[i] = 90 - Tangle[i] * 180 / PI;
+        IKFemurAngle[i] = 90 - (IKA1[i] + IKA2[i]) * 180/PI;
+        IKCoxaAngle[i]  = 90 - atan2(_bodyTgtPos.y, _bodyTgtPos.x) * 180/PI;
+    }
 }
 
 int IK_engine::generateLegServoAngles(unsigned legNum)

@@ -9,20 +9,25 @@
 #ifndef INVERSE_KINEMATICS_H
 #define INVERSE_KINEMATICS_H
 
+#include "math.h"
 #include "motion.h"
 
-class IK_engine {
-    #define NUM_LEGS 4
-    #define NUM_LINKS 3
+#define NUM_LEGS 4
+#define NUM_LINKS 3
 
-    typedef struct coord_s {
-        double x;
-        double y;
-        double z;
-    } coord_t;
+typedef struct coord_s {
+    double x;
+    double y;
+    double z;
+} coord_t;
+
+
+class IK_engine 
+{
+
 
     typedef struct angle_s {
-        double yaw;a /* About X */
+        double yaw; /* About X */
         double pitch;/* About Y */
         double roll; /* About Z */
     } angle_t;
@@ -56,6 +61,7 @@ class IK_engine {
 
     private:
         int bodyIK(void);
+        int LegIK(void);
         int generateLegServoAngles(unsigned legNum);
         
     public:
@@ -87,9 +93,7 @@ class IK_engine {
 
         /* Output of IK given foot position and ctrl input */
         double _hipAngle[NUM_LEGS];
-        double _kneeAngle[NUM_LEGS];
-      
-               
+        double _kneeAngle[NUM_LEGS];              
 };
 
 #endif /* INVERSE_KINEMATICS_H */

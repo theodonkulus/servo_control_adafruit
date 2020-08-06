@@ -25,7 +25,7 @@ unsigned int mode = DEBUG_HOME;
 
 void setup() {
   mode = DEBUG_HOME;
-  //Serial.begin(115200);
+  Serial.begin(115200);
   
    delay(10);
   // put your setup code here, to run once:
@@ -51,15 +51,33 @@ void setup() {
 
   robotMotion = new MotionDriver(ctrlCtx, NUM_JOINTS, false);
   robotMotion->setHips(90);
+    robotMotion->moveAnkles(0);
+
   
 }
 
+void getCommands(){
+    uint8_t bytesToRead = Serial.available();
+    
+    while (bytesToRead > 0 ) {
+        uint16_t dataCmd = Serial.read();
+        Serial.println(dataCmd, HEX);
+       
+    }
+}
+
+
 void loop()
 {
-    float oscOutput = oscLeg0.refresh();
-/*    static int i = 0;
+    //float oscOutput = oscLeg0.refresh();
+    float oscOutput = 0;
+
+    
+    static int i = 0;
+
+    getCommands();
      i++;
-        if ((i % 1000) == 0) 
+        /*if ((i % 1000) == 0) 
         {
            Serial.println(i);
         }*/

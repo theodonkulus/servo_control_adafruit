@@ -21,17 +21,14 @@ typedef struct coord_s {
     double z;
 } coord_t;
 
+typedef struct angle_s {
+    double roll; /* About X */
+    double pitch;/* About Y */
+    double yaw;  /* About Z */
+} angle_t;
 
 class IK_engine 
 {
-
-
-    typedef struct angle_s {
-        double yaw; /* About X */
-        double pitch;/* About Y */
-        double roll; /* About Z */
-    } angle_t;
-
     enum joint_e {
         COXA = 0,
         FEMUR,
@@ -61,7 +58,9 @@ class IK_engine
 
     private:
         int bodyIK(void);
+        int bodyFK(void);
         int LegIK(void);
+        int LegIK2(uint8_t ch);
         int generateLegServoAngles(unsigned legNum);
         
     public:
@@ -79,6 +78,12 @@ class IK_engine
         angle_t _bodyCurTilt;
         coord_t _bodyCurPos;
    
+        /* Transform Matricies per leg relative to world space */
+        float tRb[4][4];
+        float tRf[4][4];
+        float tLb[4][4];
+        float tLf[4][4];
+
         coord_t _bodyIK;
 
         angle_t _bodyTgtTilt;

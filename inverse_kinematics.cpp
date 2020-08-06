@@ -7,6 +7,8 @@
 * able to be precalculated
 *******************************************************/
 
+#include <SpeedTrig.h> /* Look up table based trig functions */
+#include <MatrixMath.h>
 #include "inverse_kinematics.h"
 //#include "cmath.h"
 
@@ -144,6 +146,62 @@ int IK_engine::bodyIK(void)
         _bodyToFootIK[i].z = rollZ[i] + pitchZ[i];
     }
 }
+
+int IK_engine::bodyFK(void)
+{
+    //precalculate sin/cos results for rotation of body
+    float sOmega =  sin(_bodyCurTilt.roll);
+    float cOmega =  cos(_bodyCurTilt.roll);
+    float sPhi   =  sin(_bodyCurTilt.pitch);  
+    float cPhi   =  cos(_bodyCurTilt.pitch);  
+    float sPsi   =  sin(_bodyCurTilt.yaw);
+    float cPsi   =  cos(_bodyCurTilt.yaw);
+
+    /* Dislpacement matricies */
+    float tM [4][4] = {{0, 0, 0, _bodyCurPos.x }, 
+                            {0, 0, 0, _bodyCurPos.y },
+                            {0, 0, 0, _bodyCurPos.z },
+                            {0, 0, 0, 0 }
+                           }; 
+
+    /* Roll Pitch Yaw matricies */
+    float rX[4][4] = { {1,      0,       0, 0},
+                       {0, cOmega, -sOmega, 0},
+                       {0, sOmega,  cOmega, 0},
+                       {0,      0,       0, 1}};
+
+    float rY[4][4] = { {  cPhi,   0,  sPhi, 0},
+                       {     0,   1,     0, 0},
+                       { -sPhi,   0,  cPhi, 0},
+                       {     0,   0,     0, 1}};
+
+    float rZ[4][4] = { {  cPsi, -sPsi, 0, 0},
+                       {  sPsi,  cPsi, 0, 0},
+                       {     0,   0,   1, 0},
+                       {     0,   0,   0, 1}};
+
+
+    /* Target Body Combination */
+    float rYZ[4][4]  = {0};
+    float rXYZ[4][4] = {0};
+
+    Matrix.Multiply(rY, rZ, 4, 4, rYZ);
+    Matrix.Multiply(rX, rYZ, 4, 4 rXYZ);
+    Matrix.Add(rXYZ, tM, 4, 4, tM);
+    
+
+}
+
+int IK_engine::LegIK2(uint8_t ch)
+{
+    double L3 = _linkLength[TIBIA];
+    double L2 = _linkLength[FEMUR];
+    double L1 = _linkLength[COXA]
+
+    double zOffset = _legOffset.x[ch];
+    
+}
+
 
 int IK_engine::LegIK(void)
 {

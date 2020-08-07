@@ -158,11 +158,10 @@ int IK_engine::bodyFK(void)
     float cPsi   =  cos(_bodyCurTilt.yaw);
 
     /* Dislpacement matricies */
-    float tM [4][4] = {{0, 0, 0, _bodyCurPos.x }, 
-                            {0, 0, 0, _bodyCurPos.y },
-                            {0, 0, 0, _bodyCurPos.z },
-                            {0, 0, 0, 0 }
-                           }; 
+    float tM[4][4] = {{0, 0, 0, _bodyCurPos.x }, 
+                      {0, 0, 0, _bodyCurPos.y },
+                      {0, 0, 0, _bodyCurPos.z },
+                      {0, 0, 0, 0 }}; 
 
     /* Roll Pitch Yaw matricies */
     float rX[4][4] = { {1,      0,       0, 0},
@@ -185,9 +184,9 @@ int IK_engine::bodyFK(void)
     float rYZ[4][4]  = {0};
     float rXYZ[4][4] = {0};
 
-    Matrix.Multiply(rY, rZ, 4, 4, rYZ);
-    Matrix.Multiply(rX, rYZ, 4, 4 rXYZ);
-    Matrix.Add(rXYZ, tM, 4, 4, tM);
+    Matrix.Multiply((mtx_type *)rY, (mtx_type *)rZ, 4, 4, 4, (mtx_type*)rYZ);
+    Matrix.Multiply((mtx_type *)rX, (mtx_type *)rYZ, 4, 4, 4, (mtx_type *)rXYZ);
+    Matrix.Add((mtx_type *)rXYZ, (mtx_type *)tM, 4, 4, (mtx_type *)tM);
     
 
 }
@@ -196,9 +195,9 @@ int IK_engine::LegIK2(uint8_t ch)
 {
     double L3 = _linkLength[TIBIA];
     double L2 = _linkLength[FEMUR];
-    double L1 = _linkLength[COXA]
+    double L1 = _linkLength[COXA];
 
-    double zOffset = _legOffset.x[ch];
+    double zOffset = _legOffset[ch].x;
     
 }
 

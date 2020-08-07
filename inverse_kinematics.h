@@ -16,15 +16,15 @@
 #define NUM_LINKS 3
 
 typedef struct coord_s {
-    double x;
-    double y;
-    double z;
+    float x;
+    float y;
+    float z;
 } coord_t;
 
 typedef struct angle_s {
-    double roll; /* About X */
-    double pitch;/* About Y */
-    double yaw;  /* About Z */
+    float roll; /* About X */
+    float pitch;/* About Y */
+    float yaw;  /* About Z */
 } angle_t;
 
 class IK_engine 

@@ -26,15 +26,19 @@ IK_engine::IK_engine()
 
    _bodyLength = 42.00; //Same because droid is a circle 
 
-   /* Offset from center of the body */
+   /* Leg offset from center of the body */
    _legOffset[0].x =  42.00;
    _legOffset[0].y =  42.00;
+   _legOffset[0].z =  0;
    _legOffset[1].x =  42.00;
    _legOffset[1].x = -42.00;
+   _legOffset[1].z =  0;
    _legOffset[2].x = -42.00;
    _legOffset[2].y = -42.00;
+   _legOffset[2].z =  0;
    _legOffset[3].x = -42.00;
    _legOffset[3].y =  42.00;
+   _legOffset[3].z =  0;
 
     /* cos(angle /180 * pi) * link0 * link1 , 
       since legs are pi/4 offset we save calculating this  just resolves to scaling by 1/sqrt(2)*/
@@ -189,6 +193,25 @@ int IK_engine::bodyFK(void)
     Matrix.Add((mtx_type *)rXYZ, (mtx_type *)tM, 4, 4, (mtx_type *)tM);
     
 
+    /* Get Hip Matricies relative to the CoM of the body*/
+    /* Precalculated rotation entires of legOffsetMtx. Hips are 90 degrees from body. Reults
+       in us doing a bunch of redundant lookups/calcs since sin(90)= 1 cos(90) = 0
+       Doing this also lets just just reduce this just a lookup of leg offset before getting
+       our resultant 4 matricies for each leg relative to the body and world. */
+     mtx_type * legMatricies[NUM_LEGS] = {(mtx_type *)_tRb, (mtx_type *)_tRf, (mtx_type*)_tLb, (mtx_type*)_tLf};
+    
+
+    for (int leg = 0; leg < 4; leg++)
+    {
+         float legOffsetMtx[4][4] = {{ 0, 0, 1, _legOffset[leg].x },
+                                     { 0, 1, 0, _legOffset[leg].y },
+                                     {-1, 0, 0, _legOffset[leg].z },
+                                     { 0, 0, 0, 1} };
+
+         Matrix.Multiply((mtx_type *)tM, 
+                         (mtx_type *)legOffsetMtx, 4, 4, 4, 
+                         legMatricies[leg]); 
+    }
 }
 
 int IK_engine::LegIK2(uint8_t ch)

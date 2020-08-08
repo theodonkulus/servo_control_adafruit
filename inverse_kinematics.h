@@ -79,10 +79,10 @@ class IK_engine
         coord_t _bodyCurPos;
    
         /* Transform Matricies per leg relative to world space */
-        float tRb[4][4];
-        float tRf[4][4];
-        float tLb[4][4];
-        float tLf[4][4];
+        float _tRb[4][4];
+        float _tRf[4][4];
+        float _tLb[4][4];
+        float _tLf[4][4];
 
         coord_t _bodyIK;
 
